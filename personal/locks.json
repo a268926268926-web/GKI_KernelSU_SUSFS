@@ -1,0 +1,25 @@
+{
+  "target": "android16-6.12",
+  "version": "6.12.81",
+  "page_size": "4k",
+  "patch_level": "2026-06",
+  "allow_version_mismatch": false,
+  "perf": false,
+  "wild": "222173a6397e27bcc6461d4600c3ecb5d8ac61da",
+  "manifest": "8a3e1f393320001d98b00a0d19850d0fc56239ac",
+  "superproject": "17a7253d84ac39ae9f94b19b00e702736d50e96c",
+  "common": "156718920225fb0bce7ad9a95dc4df54c3d9032e",
+  "repo_tool": "f4ce9572d1f9e412a5685297d2806ce410e4d4a0",
+  "bakasu_codegen_guard_backport": "d5e9e025b8b49155f8014684d64c91742b465f65",
+  "components": {
+    "BakaSU": {"url": "https://github.com/Baka-SU/BakaSU.git", "commit": "c0c96a4087285ff82d71003d4186629de1c46b3c"},
+    "susfs4ksu": {"url": "https://gitlab.com/simonpunk/susfs4ksu.git", "commit": "9c9f19d8395693327c78df36569b44e94c187b8a"},
+    "kernel_patches": {"url": "https://github.com/WildKernels/kernel_patches.git", "commit": "fa76c90e2cb284e6ce22b0b008ad4dd19820dbb1"},
+    "AnyKernel3": {"url": "https://github.com/WildKernels/AnyKernel3.git", "commit": "e1e9dce98430c5c6f231f7094a8c7f4ecaf50948"},
+    "Droidspaces-OSS": {"url": "https://github.com/ravindu644/Droidspaces-OSS.git", "commit": "847ecdd2c9431f3fa69647eed4060738275aeece"},
+    "NoMount": {"url": "https://github.com/maxsteeel/nomount.git", "commit": "e240bb031820fd3f7de5dadb007281b33bb70634"},
+    "Baseband-guard": {"url": "https://github.com/vc-teahouse/Baseband-guard.git", "commit": "a54e0dc6cf0aff4dd87fec49644a02d2eb612905"}
+  },
+  "manager": {"repository": "Baka-SU/BakaSU", "run": 40102364842, "commit": "c0c96a4087285ff82d71003d4186629de1c46b3c", "version_code": 35251, "uapi": 6},
+  "adios": {"url": "https://github.com/cctv18/android_gki_kernel_common", "commit": "58ee67741556c83c523f48518284c4a6b1ef31d6", "path": "block/adios.c", "sha256": "3029889c1f2fe3087a96fbd66f82b5e8ec13816c97b76ae83fb622da80f22a12"}
+}
