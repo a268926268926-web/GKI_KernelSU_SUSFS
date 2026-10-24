@@ -80,7 +80,7 @@ if __name__ == "__main__":
         print("PASS: source provenance recorded; no patch rejects")
     elif mode == "package":
         output = kernel / "bazel-bin/common/kernel_aarch64"
-        cfg = kernel / "bazel-bin/common/kernel_aarch64_config/out_dir/.config"
+        cfg = output / "kernel_aarch64_dot_config"
         assert cfg.is_file(), f"Real Kleaf final configuration missing: {cfg}"
         assert (output / "Image").is_file()
         required = require_config(config_values(cfg.read_text()))
@@ -101,7 +101,7 @@ if __name__ == "__main__":
         assert "6.12.81-android16" in banner_text, banner_text
         shutil.copy2(cfg, evidence / "final.config")
         shutil.copy2(output / "System.map", evidence / "System.map")
-        shutil.copy2(output / "Module.symvers", evidence / "Module.symvers")
+        shutil.copy2(output / "kernel_aarch64_Module.symvers", evidence / "Module.symvers")
         # Keep vmlinux independently compressed; it is evidence, not a flash file.
         with (evidence / "vmlinux.gz").open("wb") as compressed:
             subprocess.run(["gzip", "-c", str(output / "vmlinux")], stdout=compressed, check=True)

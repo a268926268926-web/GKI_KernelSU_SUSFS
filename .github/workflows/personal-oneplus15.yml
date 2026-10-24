@@ -175,11 +175,8 @@ jobs:
         working-directory: kernel
         run: |
           set -euo pipefail
-          tools/bazel build --config=fast \
-            //common:kernel_aarch64/Image \
-            //common:kernel_aarch64/vmlinux \
-            //common:kernel_aarch64/System.map \
-            //common:kernel_aarch64/Module.symvers 2>&1 | tee ../evidence/build.log
+          tools/bazel build --config=fast //common:kernel_aarch64 \
+            2>&1 | tee ../evidence/build.log
 
       - name: Verify real config, native symbols and deliverable hashes
         run: python3 personal/evidence.py package
