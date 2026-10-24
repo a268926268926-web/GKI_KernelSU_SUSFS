@@ -50,7 +50,9 @@ build = common / "BUILD.bazel"
 src = build.read_text()
 anchor = '    name = "kernel_aarch64",'
 assert src.count(anchor) == 1
-src = src.replace(anchor, anchor + '\n    check_defconfig = "disabled",\n    keep_dot_config = True,\n    keep_module_symvers = True,', 1)
+# This pinned common_kernel wrapper already retains .config and Module.symvers;
+# it does not expose the lower-level kernel_build keep_* attributes.
+src = src.replace(anchor, anchor + '\n    check_defconfig = "disabled",', 1)
 build.write_text(src)
 
 # Guard source version independently from filenames or workflow input values.
