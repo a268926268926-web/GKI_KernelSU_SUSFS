@@ -202,8 +202,16 @@ jobs:
         working-directory: kernel
         run: |
           set -euo pipefail
-          tools/bazel build --config=fast //common:kernel_aarch64 \
+          targets=(//common:kernel_aarch64)
+          if [[ "$BUILD_VARIANT" == "C3" || "$BUILD_VARIANT" == "C" ]]; then
+            targets+=(//common:kernel_aarch64_modules)
+          fi
+          tools/bazel build --config=fast "${targets[@]}" \
             2>&1 | tee ../evidence/build.log
+
+      - name: Package optional C3 extra modules
+        if: env.BUILD_VARIANT == 'C3' || env.BUILD_VARIANT == 'C'
+        run: python3 personal/package_extra_modules.py
 
       - name: Verify real config, native symbols and deliverable hashes
         run: python3 personal/evidence.py package

@@ -1,0 +1,6 @@
+id=oneplus15_c_hci_vhci
+name=OnePlus 15 C Virtual HCI
+version=C
+versionCode=1
+author=Codex
+description=Optional hci_vhci.ko for Linux containers; loaded after Bluetooth core is available.
