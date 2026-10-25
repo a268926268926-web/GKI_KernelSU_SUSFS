@@ -47,6 +47,33 @@ def require_config(config):
     required.update({"CONFIG_KSU_TRACEPOINT_HOOK": "n", "CONFIG_KSU_MANUAL_HOOK": "n",
                      "CONFIG_KSU_MULTI_MANAGER_SUPPORT": "n", "CONFIG_DEFAULT_TCP_CONG": '"bbr"',
                      "CONFIG_MQ_IOSCHED_ADIOS": "y" if variant == "B" else "n"})
+    if variant.startswith("C"):
+        required.update({
+            "CONFIG_ZRAM": "y", "CONFIG_ZSMALLOC": "y",
+            "CONFIG_CRYPTO_LZ4": "y", "CONFIG_CRYPTO_LZ4K": "y", "CONFIG_CRYPTO_LZ4KD": "y",
+            "CONFIG_CRYPTO_LZ4HC": "n", "CONFIG_CRYPTO_842": "n",
+            "CONFIG_ZRAM_BACKEND_LZ4": "y", "CONFIG_ZRAM_BACKEND_LZ4K": "y",
+            "CONFIG_ZRAM_BACKEND_LZ4KD": "y", "CONFIG_ZRAM_BACKEND_LZ4HC": "n",
+            "CONFIG_ZRAM_BACKEND_842": "n", "CONFIG_ZRAM_DEF_COMP_LZ4KD": "y",
+            "CONFIG_ZRAM_DEF_COMP": '"lz4kd"', "CONFIG_MQ_IOSCHED_ADIOS": "y",
+        })
+    if variant in {"C2", "C3", "C"}:
+        required.update({
+            "CONFIG_TCP_CONG_BBR": "y", "CONFIG_TCP_CONG_BBR3": "y",
+            "CONFIG_TCP_CONG_VEGAS": "y", "CONFIG_TCP_CONG_NV": "y",
+            "CONFIG_DEFAULT_TCP_CONG": '"bbr3"',
+            "CONFIG_NF_TABLES": "y", "CONFIG_NF_TABLES_INET": "y",
+            "CONFIG_NF_TABLES_IPV4": "y", "CONFIG_NF_TABLES_IPV6": "y",
+            "CONFIG_NF_TABLES_NETDEV": "y", "CONFIG_NFT_CT": "y",
+            "CONFIG_NFT_NAT": "y", "CONFIG_NFT_MASQ": "y", "CONFIG_NFT_REDIR": "y",
+            "CONFIG_NFT_COMPAT": "y", "CONFIG_NFT_FIB_INET": "y",
+            "CONFIG_NET_SCH_PIE": "y",
+        })
+    if variant in {"C3", "C"}:
+        required.update({
+            "CONFIG_BT": "m", "CONFIG_BT_HCIVHCI": "m",
+            "CONFIG_REKERNEL": "y", "CONFIG_REKERNEL_NETWORK": "y",
+        })
     errors = {k: {"expected": v, "actual": config.get(k, "n")} for k, v in required.items() if config.get(k, "n") != v}
     assert not errors, json.dumps(errors, indent=2)
     assert config.get("CONFIG_ARM64_16K_PAGES", "n") == "n"

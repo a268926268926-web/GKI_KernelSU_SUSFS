@@ -11,6 +11,22 @@
   "common": "156718920225fb0bce7ad9a95dc4df54c3d9032e",
   "repo_tool": "f4ce9572d1f9e412a5685297d2806ce410e4d4a0",
   "bakasu_codegen_guard_backport": "d5e9e025b8b49155f8014684d64c91742b465f65",
+  "lz4_patches": {
+    "url": "https://github.com/cctv18/oppo_oplus_realme_sm8850",
+    "commit": "6c1ffdac3ebf7ebb80254427a7972262b0a8f64e",
+    "files": {
+      "001-lz4.patch": "88a72042792e7235902a2c2ce3253fa5857428fcdfac2f318aa8ff627dbb4aba",
+      "lz4kd.patch": "2d500641cf669df1b1e527607aa90e852daef46d23530c3d30fd63e9d11bd886"
+    }
+  },
+  "network_patches": {
+    "bbrv3": {
+      "url": "https://github.com/WildKernels/kernel_patches",
+      "commit": "fa76c90e2cb284e6ce22b0b008ad4dd19820dbb1",
+      "path": "common/bbrv3/0001-net-tcp-backport-BBRv3-to-android16-6.12.patch",
+      "sha256": "cbdfcb6f6c3573dc5e93644218ff425434b5b1d7cd764536ab6aa8eed5cefd62"
+    }
+  },
   "components": {
     "BakaSU": {"url": "https://github.com/Baka-SU/BakaSU.git", "commit": "c0c96a4087285ff82d71003d4186629de1c46b3c"},
     "susfs4ksu": {"url": "https://gitlab.com/simonpunk/susfs4ksu.git", "commit": "9c9f19d8395693327c78df36569b44e94c187b8a"},
@@ -19,6 +35,8 @@
     "Droidspaces-OSS": {"url": "https://github.com/ravindu644/Droidspaces-OSS.git", "commit": "847ecdd2c9431f3fa69647eed4060738275aeece"},
     "NoMount": {"url": "https://github.com/maxsteeel/nomount.git", "commit": "e240bb031820fd3f7de5dadb007281b33bb70634"},
     "Baseband-guard": {"url": "https://github.com/vc-teahouse/Baseband-guard.git", "commit": "a54e0dc6cf0aff4dd87fec49644a02d2eb612905"}
+    ,
+    "Re-Kernel": {"url": "https://github.com/Sakion-Team/Re-Kernel.git", "commit": "ac08296174d7fb2801c0eee1084f067a34f8a0fe"}
   },
   "manager": {"repository": "Baka-SU/BakaSU", "run": 40102364842, "commit": "c0c96a4087285ff82d71003d4186629de1c46b3c", "version_code": 35251, "uapi": 6},
   "adios": {"url": "https://github.com/cctv18/android_gki_kernel_common", "commit": "58ee67741556c83c523f48518284c4a6b1ef31d6", "path": "block/adios.c", "sha256": "3029889c1f2fe3087a96fbd66f82b5e8ec13816c97b76ae83fb622da80f22a12"}

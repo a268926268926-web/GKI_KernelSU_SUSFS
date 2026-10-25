@@ -2,6 +2,7 @@
 """Local syntax and failure-gate checks; no kernel build or device access."""
 import ast
 import copy
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -24,6 +25,11 @@ for step in data["jobs"]["build"]["steps"]:
         subprocess.run(["bash", "-n"], input=script, text=True, check=True)
         shells += 1
 locks = json.loads((here / "locks.json").read_text())
+for file, expected in locks["lz4_patches"]["files"].items():
+    patch = here / "patches/lz4" / file
+    assert hashlib.file_digest(patch.open("rb"), "sha256").hexdigest() == expected
+bbr3 = here / "patches/network/0001-net-tcp-backport-BBRv3-to-android16-6.12.patch"
+assert hashlib.file_digest(bbr3.open("rb"), "sha256").hexdigest() == locks["network_patches"]["bbrv3"]["sha256"]
 projects = ET.parse(here / "manifest.xml").findall("project")
 assert len(projects) == 50
 assert all(re.fullmatch("[a-f0-9]{40}", p.get("revision", "")) for p in projects)
@@ -45,4 +51,11 @@ assert evidence.config_values('# CONFIG_KSU is not set\nCONFIG_DEFAULT_TCP_CONG=
     "CONFIG_KSU": "n", "CONFIG_DEFAULT_TCP_CONG": '"bbr"'}
 assert locks["allow_version_mismatch"] is False and locks["perf"] is False
 assert any(s.get("name") == "Require successful A before B" and s.get("if") == "env.BUILD_VARIANT == 'B'" for s in data["jobs"]["build"]["steps"])
+triggers = data.get("on", data.get(True))
+assert "C1" in triggers["workflow_dispatch"]["inputs"]["variant"]["options"]
+assert any(s.get("name") == "Apply locked LZ4 source chain" for s in data["jobs"]["build"]["steps"])
+assert any(s.get("name") == "Apply locked BBRv3 source backport" for s in data["jobs"]["build"]["steps"])
+assert any(s.get("name") == "Apply locked Re:Kernel source integration" for s in data["jobs"]["build"]["steps"])
+assert any(s.get("name") == "Require prior successful C stage" for s in data["jobs"]["build"]["steps"])
+assert locks["components"]["Re-Kernel"]["commit"] == "ac08296174d7fb2801c0eee1084f067a34f8a0fe"
 print(f"PASS: {shells} workflow shell blocks, Python syntax, 50 immutable project pins, config failure gates, B dependency")

@@ -1,15 +1,15 @@
-name: OnePlus 15 locked A-B build
+name: OnePlus 15 locked staged build
 
 on:
   push:
-    branches: [oneplus15-6.12.81-bakasu]
+    branches: [oneplus15-6.12.81-bakasu, oneplus15-6.12.81-c]
     paths: [personal/**, .github/workflows/personal-oneplus15.yml]
   workflow_dispatch:
     inputs:
       variant:
-        description: A baseline; B adds optional ADIOS after successful A at this commit
+        description: A/B baseline or staged C feature build
         type: choice
-        options: [A, B]
+        options: [A, B, C1, C2, C3, C]
         default: A
 
 permissions:
@@ -17,11 +17,11 @@ permissions:
   actions: read
 
 concurrency:
-  group: personal-oneplus15-${{ github.ref }}-${{ inputs.variant || 'A' }}
+  group: personal-oneplus15-${{ github.ref }}-${{ inputs.variant || (github.ref_name == 'oneplus15-6.12.81-c' && 'C1' || 'A') }}
   cancel-in-progress: false
 
 env:
-  BUILD_VARIANT: ${{ inputs.variant || 'A' }}
+  BUILD_VARIANT: ${{ inputs.variant || (github.ref_name == 'oneplus15-6.12.81-c' && 'C1' || 'A') }}
   SOURCE_DATE_EPOCH: '1780633200'
   KBUILD_BUILD_TIMESTAMP: Fri Jun 05 04:20:00 UTC 2026
   KBUILD_BUILD_USER: kleaf
@@ -45,6 +45,21 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/personal-oneplus15.yml/runs?head_sha=${GITHUB_SHA}&status=success&per_page=100" \
             --jq '.workflow_runs[] | select(.display_title == "OnePlus 15 A") | .id' > /tmp/prior-a-runs
           test -s /tmp/prior-a-runs
+
+      - name: Require prior successful C stage
+        if: env.BUILD_VARIANT == 'C2' || env.BUILD_VARIANT == 'C3' || env.BUILD_VARIANT == 'C'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          case "$BUILD_VARIANT" in
+            C2) prior=C1 ;;
+            C3) prior=C2 ;;
+            C)  prior=C3 ;;
+          esac
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/personal-oneplus15.yml/runs?head_sha=${GITHUB_SHA}&status=success&per_page=100" \
+            --jq '.workflow_runs[].display_title' > /tmp/prior-c-runs
+          grep -Fx "OnePlus 15 $prior" /tmp/prior-c-runs
 
       - name: Free runner disk
         uses: endersonmenezes/free-disk-space@d8d1e404d2314ff42e5393ba5545d192ae63afd4 # v4
@@ -165,6 +180,18 @@ jobs:
       - name: Wild module export policy
         uses: ./.github/actions/remove-protected-exports
 
+      - name: Apply locked LZ4 source chain
+        if: startsWith(env.BUILD_VARIANT, 'C')
+        run: python3 personal/apply_lz4.py
+
+      - name: Apply locked BBRv3 source backport
+        if: env.BUILD_VARIANT == 'C2' || env.BUILD_VARIANT == 'C3' || env.BUILD_VARIANT == 'C'
+        run: python3 personal/apply_network.py
+
+      - name: Apply locked Re:Kernel source integration
+        if: env.BUILD_VARIANT == 'C3' || env.BUILD_VARIANT == 'C'
+        run: python3 personal/apply_rekernel.py
+
       - name: Assert version and final requested choices
         run: python3 personal/configure.py
 
@@ -200,4 +227,4 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-run-name: OnePlus 15 ${{ inputs.variant || 'A' }}
+run-name: OnePlus 15 ${{ inputs.variant || (github.ref_name == 'oneplus15-6.12.81-c' && 'C1' || 'A') }}
