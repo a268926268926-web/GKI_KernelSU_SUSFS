@@ -130,6 +130,7 @@ if __name__ == "__main__":
         assert banner, "Kernel version banner absent"
         banner_text = banner.group().decode(errors="replace")
         assert "6.12.81-android16" in banner_text, banner_text
+        assert f"Personal{variant}" in banner_text, banner_text
         shutil.copy2(cfg, evidence / "final.config")
         shutil.copy2(output / "System.map", evidence / "System.map")
         shutil.copy2(output / "kernel_aarch64_Module.symvers", evidence / "Module.symvers")
