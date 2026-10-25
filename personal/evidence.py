@@ -50,7 +50,11 @@ def require_config(config):
     if variant.startswith("C"):
         required.update({
             "CONFIG_ZRAM": "y", "CONFIG_ZSMALLOC": "y",
+            "CONFIG_KERNEL_MODE_NEON": "y",
+            "CONFIG_LZ4_COMPRESS": "y", "CONFIG_LZ4_DECOMPRESS": "y",
             "CONFIG_CRYPTO_LZ4": "y", "CONFIG_CRYPTO_LZ4K": "y", "CONFIG_CRYPTO_LZ4KD": "y",
+            "CONFIG_LZ4K_COMPRESS": "y", "CONFIG_LZ4K_DECOMPRESS": "y",
+            "CONFIG_LZ4KD_COMPRESS": "y", "CONFIG_LZ4KD_DECOMPRESS": "y",
             "CONFIG_CRYPTO_LZ4HC": "n", "CONFIG_CRYPTO_842": "n",
             "CONFIG_ZRAM_BACKEND_LZ4": "y", "CONFIG_ZRAM_BACKEND_LZ4K": "y",
             "CONFIG_ZRAM_BACKEND_LZ4KD": "y", "CONFIG_ZRAM_BACKEND_LZ4HC": "n",
