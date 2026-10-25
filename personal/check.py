@@ -28,6 +28,9 @@ locks = json.loads((here / "locks.json").read_text())
 for file, expected in locks["lz4_patches"]["files"].items():
     patch = here / "patches/lz4" / file
     assert hashlib.file_digest(patch.open("rb"), "sha256").hexdigest() == expected
+for file, expected in locks["lz4_backends"]["files"].items():
+    backend = here / "lz4" / file
+    assert hashlib.file_digest(backend.open("rb"), "sha256").hexdigest() == expected
 bbr3 = here / "patches/network/0001-net-tcp-backport-BBRv3-to-android16-6.12.patch"
 assert hashlib.file_digest(bbr3.open("rb"), "sha256").hexdigest() == locks["network_patches"]["bbrv3"]["sha256"]
 projects = ET.parse(here / "manifest.xml").findall("project")

@@ -19,6 +19,15 @@
       "lz4kd.patch": "2d500641cf669df1b1e527607aa90e852daef46d23530c3d30fd63e9d11bd886"
     }
   },
+  "lz4_backends": {
+    "upstream": "https://github.com/SukiSU-Ultra/SukiSU_patch",
+    "adapter": "https://github.com/yuhangle/Action_OneplusAce3v_SukiSU",
+    "commit": "84a0e6f17f7dbc730e13baed2abb08c68466f7fc",
+    "files": {
+      "backend_lz4k.c": "00320a41576bf2e92c87c84bbca26007647c93dfb14a06046a3d92a91ca0eb0c",
+      "backend_lz4kd.c": "722c28da7b7d9a40773907dbd6e4b400f42cf7318c6d0e6b4ddf7041d6549b66"
+    }
+  },
   "network_patches": {
     "bbrv3": {
       "url": "https://github.com/WildKernels/kernel_patches",
