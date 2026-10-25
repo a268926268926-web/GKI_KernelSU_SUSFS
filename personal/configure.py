@@ -114,6 +114,36 @@ assert src.count(anchor) == 1
 src = src.replace(anchor, anchor + '\n    check_defconfig = "disabled",', 1)
 build.write_text(src)
 
+# Built-in implementations do not produce the module files declared by the
+# stock GKI module list. Remove these entries from the module/system_dlkm list
+# so Kleaf does not require nonexistent zram.ko or zsmalloc.ko outputs.
+modules_bzl = common / "modules.bzl"
+src = modules_bzl.read_text()
+common_list_end = src.index("]\n\n# Deprecated")
+common_list, remainder = src[:common_list_end], src[common_list_end:]
+for relative in ["drivers/block/zram/zram.ko", "mm/zsmalloc.ko"]:
+    entry = f'    "{relative}",\n'
+    assert common_list.count(entry) == 1, relative
+    common_list = common_list.replace(entry, "", 1)
+modules_bzl.write_text(common_list + remainder)
+
+if has_root_container:
+    # hci_vhci is deliberately not part of stock GKI. Add its module output
+    # only to the 4K kernel_aarch64 target so it can be packaged separately.
+    src = build.read_text()
+    start = src.index('common_kernel(\n    name = "kernel_aarch64",')
+    end = src.index("\n)\n\ncommon_kernel(", start)
+    block = src[start:end]
+    target = '    module_implicit_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64"),'
+    assert block.count(target) == 1
+    replacement = (
+        '    module_implicit_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64") + [\n'
+        '        "drivers/bluetooth/hci_vhci.ko",\n'
+        '    ],'
+    )
+    src = src[:start] + block.replace(target, replacement, 1) + src[end:]
+    build.write_text(src)
+
 # Guard source version independently from filenames or workflow input values.
 make = (common / "Makefile").read_text()
 version = ".".join(re.search(rf"(?m)^{key}\s*=\s*(\d+)\s*$", make).group(1) for key in ["VERSION", "PATCHLEVEL", "SUBLEVEL"])
