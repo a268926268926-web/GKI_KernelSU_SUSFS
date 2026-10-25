@@ -67,5 +67,14 @@ tcp_input.write_text(source)
 
 assert not list(common.rglob("*.rej")), "BBRv3 patch produced rejects"
 assert (common / "net/ipv4/tcp_bbr3.c").is_file()
-assert "config TCP_CONG_BBR3" in (common / "net/ipv4/Kconfig").read_text()
-print("PASS: pinned BBRv3 6.12 backport applied with zero rejects")
+kconfig = common / "net/ipv4/Kconfig"
+source = kconfig.read_text()
+wrong_condition = 'default "bbr3" if DEFAULT_BBR\n'
+right_condition = 'default "bbr3" if DEFAULT_BBR3\n'
+assert source.count(wrong_condition) == 1
+kconfig.write_text(source.replace(wrong_condition, right_condition, 1))
+source = kconfig.read_text()
+assert "config TCP_CONG_BBR3" in source
+assert "config DEFAULT_BBR3" in source
+assert right_condition in source
+print("PASS: pinned BBRv3 6.12 backport applied with zero rejects and corrected default selection")

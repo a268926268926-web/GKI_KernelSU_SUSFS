@@ -65,12 +65,16 @@ def require_config(config):
         required.update({
             "CONFIG_TCP_CONG_BBR": "y", "CONFIG_TCP_CONG_BBR3": "y",
             "CONFIG_TCP_CONG_VEGAS": "y", "CONFIG_TCP_CONG_NV": "y",
+            "CONFIG_DEFAULT_CUBIC": "n", "CONFIG_DEFAULT_BBR": "n",
+            "CONFIG_DEFAULT_BBR3": "y",
             "CONFIG_DEFAULT_TCP_CONG": '"bbr3"',
             "CONFIG_NF_TABLES": "y", "CONFIG_NF_TABLES_INET": "y",
             "CONFIG_NF_TABLES_IPV4": "y", "CONFIG_NF_TABLES_IPV6": "y",
             "CONFIG_NF_TABLES_NETDEV": "y", "CONFIG_NFT_CT": "y",
             "CONFIG_NFT_NAT": "y", "CONFIG_NFT_MASQ": "y", "CONFIG_NFT_REDIR": "y",
-            "CONFIG_NFT_COMPAT": "y", "CONFIG_NFT_FIB_INET": "y",
+            "CONFIG_NFT_COMPAT": "y", "CONFIG_NFT_FIB": "y",
+            "CONFIG_NFT_FIB_IPV4": "y", "CONFIG_NFT_FIB_IPV6": "y",
+            "CONFIG_NFT_FIB_INET": "y",
             "CONFIG_NET_SCH_PIE": "y",
         })
     if variant in {"C3", "C"}:
