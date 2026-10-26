@@ -10,9 +10,11 @@ import shutil
 here = Path(__file__).resolve().parent
 common = here.parent / "kernel/common"
 variant = os.environ.get("BUILD_VARIANT", "A")
-assert variant in {"A", "B", "C1", "C2", "C3", "C"}
+assert variant in {"A", "B", "C1", "C2", "C2D1", "C2D2", "C3", "C"}
 is_c = variant.startswith("C")
-has_network = variant in {"C2", "C3", "C"}
+has_network = variant in {"C2", "C2D1", "C2D2", "C3", "C"}
+has_bbr3 = variant in {"C2", "C2D2", "C3", "C"}
+bbr3_default = variant in {"C2", "C3", "C"}
 has_root_container = variant in {"C3", "C"}
 locks = json.loads((here / "locks.json").read_text())
 if variant == "B" or is_c:
@@ -70,13 +72,9 @@ if is_c:
 if has_network:
     required.update({
         "CONFIG_TCP_CONG_BBR": "y",
-        "CONFIG_TCP_CONG_BBR3": "y",
         "CONFIG_TCP_CONG_VEGAS": "y",
         "CONFIG_TCP_CONG_NV": "y",
         "CONFIG_DEFAULT_CUBIC": "n",
-        "CONFIG_DEFAULT_BBR": "n",
-        "CONFIG_DEFAULT_BBR3": "y",
-        "CONFIG_DEFAULT_TCP_CONG": '"bbr3"',
         "CONFIG_NF_TABLES": "y",
         "CONFIG_NF_TABLES_INET": "y",
         "CONFIG_NF_TABLES_IPV4": "y",
@@ -93,6 +91,21 @@ if has_network:
         "CONFIG_NFT_FIB_INET": "y",
         "CONFIG_NET_SCH_PIE": "y",
     })
+    if has_bbr3:
+        required["CONFIG_TCP_CONG_BBR3"] = "y"
+    if bbr3_default:
+        required.update({
+            "CONFIG_DEFAULT_BBR": "n",
+            "CONFIG_DEFAULT_BBR3": "y",
+            "CONFIG_DEFAULT_TCP_CONG": '"bbr3"',
+        })
+    else:
+        required.update({
+            "CONFIG_DEFAULT_BBR": "y",
+            "CONFIG_DEFAULT_TCP_CONG": '"bbr"',
+        })
+        if has_bbr3:
+            required["CONFIG_DEFAULT_BBR3"] = "n"
 if has_root_container:
     required.update({
         "CONFIG_BT": "m",
@@ -105,9 +118,10 @@ src = defconfig.read_text()
 for key, value in required.items():
     src = re.sub(rf"(?m)^(?:{key}=.*|# {key} is not set)\n?", "", src)
     src += f"{key}={value}\n"
-# C1 has no BBRv3 source patch yet. Later C stages add it explicitly.
-if not has_network:
+# Variants without the BBRv3 source patch must not retain BBRv3 symbols.
+if not has_bbr3:
     src = re.sub(r"(?m)^CONFIG_TCP_CONG_BBR3=.*\n?", "", src)
+    src = re.sub(r"(?m)^CONFIG_DEFAULT_BBR3=.*\n?", "", src)
 defconfig.write_text(src)
 
 # Use actual config.gz generated from the real .config; no stock substitution.

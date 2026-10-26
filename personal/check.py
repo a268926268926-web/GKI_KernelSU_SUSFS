@@ -55,7 +55,8 @@ assert evidence.config_values('# CONFIG_KSU is not set\nCONFIG_DEFAULT_TCP_CONG=
 assert locks["allow_version_mismatch"] is False and locks["perf"] is False
 assert any(s.get("name") == "Require successful A before B" and s.get("if") == "env.BUILD_VARIANT == 'B'" for s in data["jobs"]["build"]["steps"])
 triggers = data.get("on", data.get(True))
-assert "C1" in triggers["workflow_dispatch"]["inputs"]["variant"]["options"]
+variants = triggers["workflow_dispatch"]["inputs"]["variant"]["options"]
+assert {"C1", "C2", "C2D1", "C2D2", "C3", "C"} <= set(variants)
 assert any(s.get("name") == "Apply locked LZ4 source chain" for s in data["jobs"]["build"]["steps"])
 assert any(s.get("name") == "Apply locked BBRv3 source backport" for s in data["jobs"]["build"]["steps"])
 assert any(s.get("name") == "Apply locked Re:Kernel source integration" for s in data["jobs"]["build"]["steps"])

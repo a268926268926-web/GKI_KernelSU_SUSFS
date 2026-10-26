@@ -9,7 +9,7 @@ on:
       variant:
         description: A/B baseline or staged C feature build
         type: choice
-        options: [A, B, C1, C2, C3, C]
+        options: [A, B, C1, C2, C2D1, C2D2, C3, C]
         default: A
 
 permissions:
@@ -47,13 +47,13 @@ jobs:
           test -s /tmp/prior-a-runs
 
       - name: Require prior successful C stage
-        if: env.BUILD_VARIANT == 'C2' || env.BUILD_VARIANT == 'C3' || env.BUILD_VARIANT == 'C'
+        if: env.BUILD_VARIANT == 'C2' || env.BUILD_VARIANT == 'C2D1' || env.BUILD_VARIANT == 'C2D2' || env.BUILD_VARIANT == 'C3' || env.BUILD_VARIANT == 'C'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           case "$BUILD_VARIANT" in
-            C2) prior=C1 ;;
+            C2|C2D1|C2D2) prior=C1 ;;
             C3) prior=C2 ;;
             C)  prior=C3 ;;
           esac
@@ -185,7 +185,7 @@ jobs:
         run: python3 personal/apply_lz4.py
 
       - name: Apply locked BBRv3 source backport
-        if: env.BUILD_VARIANT == 'C2' || env.BUILD_VARIANT == 'C3' || env.BUILD_VARIANT == 'C'
+        if: env.BUILD_VARIANT == 'C2' || env.BUILD_VARIANT == 'C2D2' || env.BUILD_VARIANT == 'C3' || env.BUILD_VARIANT == 'C'
         run: python3 personal/apply_network.py
 
       - name: Apply locked Re:Kernel source integration

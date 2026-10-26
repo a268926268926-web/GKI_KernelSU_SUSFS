@@ -18,6 +18,9 @@ evidence = workspace / "evidence"
 delivery = workspace / "deliverables"
 locks = json.loads((here / "locks.json").read_text())
 variant = os.environ.get("BUILD_VARIANT", "A")
+has_network = variant in {"C2", "C2D1", "C2D2", "C3", "C"}
+has_bbr3 = variant in {"C2", "C2D2", "C3", "C"}
+bbr3_default = variant in {"C2", "C3", "C"}
 def git(path, *args):
     return subprocess.check_output(["git", "-C", str(path), *args])
 def sha(path):
@@ -61,13 +64,11 @@ def require_config(config):
             "CONFIG_ZRAM_BACKEND_842": "n", "CONFIG_ZRAM_DEF_COMP_LZ4KD": "y",
             "CONFIG_ZRAM_DEF_COMP": '"lz4kd"', "CONFIG_MQ_IOSCHED_ADIOS": "y",
         })
-    if variant in {"C2", "C3", "C"}:
+    if has_network:
         required.update({
-            "CONFIG_TCP_CONG_BBR": "y", "CONFIG_TCP_CONG_BBR3": "y",
+            "CONFIG_TCP_CONG_BBR": "y",
             "CONFIG_TCP_CONG_VEGAS": "y", "CONFIG_TCP_CONG_NV": "y",
-            "CONFIG_DEFAULT_CUBIC": "n", "CONFIG_DEFAULT_BBR": "n",
-            "CONFIG_DEFAULT_BBR3": "y",
-            "CONFIG_DEFAULT_TCP_CONG": '"bbr3"',
+            "CONFIG_DEFAULT_CUBIC": "n",
             "CONFIG_NF_TABLES": "y", "CONFIG_NF_TABLES_INET": "y",
             "CONFIG_NF_TABLES_IPV4": "y", "CONFIG_NF_TABLES_IPV6": "y",
             "CONFIG_NF_TABLES_NETDEV": "y", "CONFIG_NFT_CT": "y",
@@ -77,6 +78,21 @@ def require_config(config):
             "CONFIG_NFT_FIB_INET": "y",
             "CONFIG_NET_SCH_PIE": "y",
         })
+        if has_bbr3:
+            required["CONFIG_TCP_CONG_BBR3"] = "y"
+        else:
+            required["CONFIG_TCP_CONG_BBR3"] = "n"
+        if bbr3_default:
+            required.update({
+                "CONFIG_DEFAULT_BBR": "n", "CONFIG_DEFAULT_BBR3": "y",
+                "CONFIG_DEFAULT_TCP_CONG": '"bbr3"',
+            })
+        else:
+            required.update({
+                "CONFIG_DEFAULT_BBR": "y", "CONFIG_DEFAULT_TCP_CONG": '"bbr"',
+            })
+            if has_bbr3:
+                required["CONFIG_DEFAULT_BBR3"] = "n"
     if variant in {"C3", "C"}:
         required.update({
             "CONFIG_BT": "m", "CONFIG_BT_HCIVHCI": "m",
