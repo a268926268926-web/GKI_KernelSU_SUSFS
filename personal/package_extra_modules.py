@@ -20,9 +20,9 @@ source_module = kernel / "bazel-bin/common/kernel_aarch64"
 variant = os.environ.get("BUILD_VARIANT", "")
 
 assert variant in {"C3", "C"}, f"Optional HCI module is not part of {variant!r}"
-matches = sorted(source_module.rglob("hci_vhci.ko"))
-assert len(matches) == 1, [str(item) for item in matches]
-module = matches[0]
+module = source_module / "drivers/bluetooth/hci_vhci.ko"
+assert module.is_file(), module
+assert (source_module / "unstripped/hci_vhci.ko").is_file()
 assert module.stat().st_size > 0
 module_bytes = module.read_bytes()
 assert module_bytes[:4] == b"\x7fELF", "hci_vhci.ko is not ELF"
@@ -41,7 +41,9 @@ shutil.copy2(module, staging / "hci_vhci.ko")
 shutil.copy2(here / "modules/hci-vhci/module.prop", staging / "module.prop")
 shutil.copy2(here / "modules/hci-vhci/service.sh", staging / "service.sh")
 
-modinfo = subprocess.check_output(["modinfo", str(module)], text=True)
+modinfo_command = shutil.which("modinfo") or shutil.which("modinfo", path="/usr/sbin:/sbin")
+assert modinfo_command, "modinfo not found"
+modinfo = subprocess.check_output([modinfo_command, str(module)], text=True)
 vermagic_lines = [line.removeprefix("vermagic:").strip() for line in modinfo.splitlines()
                   if line.startswith("vermagic:")]
 assert len(vermagic_lines) == 1, modinfo

@@ -42,5 +42,25 @@ assert "obj-$(CONFIG_REKERNEL) += rekernel/" in (common / "drivers/Makefile").re
 assert "CONFIG_REKERNEL=y" in (
     common / "arch/arm64/configs/gki_defconfig"
 ).read_text()
+
+# Re:Kernel currently formats an unsigned long as int and provides two binder
+# fields that are absent from the non-feedback log format. Both become hard
+# -Wformat errors with the Android 6.12 Clang flags.
+rekernel = common / "drivers/rekernel/rekernel.c"
+source = rekernel.read_text()
+for old, new in [
+    ('seq_printf(m, "%d\\n", netlink_unit);',
+     'seq_printf(m, "%lu\\n", netlink_unit);'),
+    ('pr_info("Created Re:Kernel server! NETLINK UNIT: %d\\n", netlink_unit);',
+     'pr_info("Created Re:Kernel server! NETLINK UNIT: %lu\\n", netlink_unit);'),
+    ('sprintf(buff, "%d", netlink_unit);',
+     'sprintf(buff, "%lu", netlink_unit);'),
+    ('"type=Binder,bindertype=%s,oneway=%d,from_pid=%d,from=%d,target_pid=%d,target=%d;"',
+     '"type=Binder,bindertype=%s,oneway=%d,from_pid=%d,from=%d,target_pid=%d,target=%d,rpc_name=%s,code=%d;"'),
+]:
+    assert source.count(old) == 1, old
+    source = source.replace(old, new, 1)
+rekernel.write_text(source)
+
 assert not list(common.rglob("*.rej")), "Re:Kernel integration produced rejects"
 print("PASS: pinned Re:Kernel core and Network hooks integrated")
