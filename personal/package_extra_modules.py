@@ -55,7 +55,9 @@ assert module_vermagic.startswith(expected_release + " "), (
 shutil.copy2(module, evidence / "hci_vhci.ko")
 
 package = delivery / "OnePlus15-C-hci-vhci-KernelSU.zip"
-timestamp = time.gmtime(int(os.environ.get("SOURCE_DATE_EPOCH", "1780633200")))[:6]
+# ZIP's DOS timestamp cannot represent the non-stamped kernel epoch (1970).
+# Clamp the archive metadata only; retain the real kernel timestamp in evidence.
+timestamp = time.gmtime(max(int(os.environ.get("SOURCE_DATE_EPOCH", "0")), 315532800))[:6]
 with zipfile.ZipFile(package, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
     for name in ["module.prop", "service.sh", "hci_vhci.ko"]:
         source = staging / name

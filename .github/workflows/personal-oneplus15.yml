@@ -2,7 +2,7 @@ name: OnePlus 15 locked staged build
 
 on:
   push:
-    branches: [oneplus15-6.12.81-bakasu, oneplus15-6.12.81-c, oneplus15-6.12.81-r22]
+    branches: [oneplus15-6.12.96-r22]
     paths: [personal/**, .github/workflows/personal-oneplus15.yml]
   workflow_dispatch:
     inputs:
@@ -10,20 +10,22 @@ on:
         description: A/B baseline or staged C feature build
         type: choice
         options: [A, B, C1, C2, C2D1, C2D2, C3, C]
-        default: A
+        default: C1
+      use_cache:
+        description: Reuse this recipe's Bazel cache; disable for a cold build
+        type: boolean
+        default: true
 
 permissions:
   contents: read
   actions: read
 
 concurrency:
-  group: personal-oneplus15-${{ github.ref }}-${{ inputs.variant || (github.ref_name == 'oneplus15-6.12.81-bakasu' && 'A' || 'C1') }}
+  group: personal-oneplus15-${{ github.ref }}-${{ inputs.variant || 'C1' }}
   cancel-in-progress: false
 
 env:
-  BUILD_VARIANT: ${{ inputs.variant || (github.ref_name == 'oneplus15-6.12.81-bakasu' && 'A' || 'C1') }}
-  SOURCE_DATE_EPOCH: '1780633200'
-  KBUILD_BUILD_TIMESTAMP: Fri Jun 05 04:20:00 UTC 2026
+  BUILD_VARIANT: ${{ inputs.variant || 'C1' }}
   KBUILD_BUILD_USER: kleaf
   KBUILD_BUILD_HOST: build-host
 
@@ -36,6 +38,32 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+
+      - name: Resolve locked build target
+        id: target
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from datetime import datetime, timezone
+          import json
+          import os
+          from pathlib import Path
+          import re
+          locks = json.loads(Path("personal/locks.json").read_text())
+          assert re.fullmatch(r"\d+\.\d+\.\d+", locks["version"])
+          assert re.fullmatch(r"android\d+-\d+\.\d+", locks["target"])
+          assert locks["patch_level"] == "lts"
+          epoch = int(locks["source_date_epoch"])
+          outputs = {"version": locks["version"], "sublevel": locks["version"].split(".")[-1],
+                     "patch_level": locks["patch_level"], "page_size": locks["page_size"]}
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              for key, value in outputs.items():
+                  output.write(f"{key}={value}\n")
+          timestamp = datetime.fromtimestamp(epoch, timezone.utc).strftime("%a %b %e %H:%M:%S UTC %Y")
+          with open(os.environ["GITHUB_ENV"], "a") as env:
+              env.write(f"SOURCE_DATE_EPOCH={epoch}\nKBUILD_BUILD_TIMESTAMP={timestamp}\n")
+          print(f"Locked {locks['version']} / {locks['patch_level']} / {locks['page_size']}")
+          PY
 
       - name: Require successful A before B
         if: env.BUILD_VARIANT == 'B'
@@ -123,15 +151,15 @@ jobs:
           version: android16-6.12
           android_version: android16
           kernel_version: '6.12'
-          sublevel: '81'
-          os_patch_level: '2026-06'
+          sublevel: ${{ steps.target.outputs.sublevel }}
+          os_patch_level: ${{ steps.target.outputs.patch_level }}
           droidspaces_commit: 847ecdd2c9431f3fa69647eed4060738275aeece
       - name: NTSync
         uses: ./.github/actions/ntsync
         with:
           version: android16-6.12
           kernel_version: '6.12'
-          sublevel: '81'
+          sublevel: ${{ steps.target.outputs.sublevel }}
       - name: Unicode compatibility
         uses: ./.github/actions/unicode-fix
         with:
@@ -142,14 +170,14 @@ jobs:
           version: android16-6.12
           android_version: android16
           kernel_version: '6.12'
-          sublevel: '81'
+          sublevel: ${{ steps.target.outputs.sublevel }}
           variant: BakaSU
       - name: BTF, eBPF and FUSE-BPF
         uses: ./.github/actions/btf
         with:
           version: android16-6.12
           kernel_version: '6.12'
-          sublevel: '81'
+          sublevel: ${{ steps.target.outputs.sublevel }}
       - name: SUSFS feature configuration
         uses: ./.github/actions/susfs-config
       - name: NoMount and Baseband Guard configuration
@@ -169,8 +197,8 @@ jobs:
           version: android16-6.12
           android_version: android16
           kernel_version: '6.12'
-          sublevel: '81'
-          os_patch_level: '2026-06'
+          sublevel: ${{ steps.target.outputs.sublevel }}
+          os_patch_level: ${{ steps.target.outputs.patch_level }}
       - name: Branding with KMI generation retained
         uses: ./.github/actions/apply-kernel-branding
         with:
@@ -178,7 +206,7 @@ jobs:
           kernel_version: '6.12'
           android_version: android16
           version: android16-6.12
-          sublevel: '81'
+          sublevel: ${{ steps.target.outputs.sublevel }}
           brand_name: Personal${{ env.BUILD_VARIANT }}
           keep_kmi: 'true'
       - name: Wild module export policy
@@ -202,16 +230,96 @@ jobs:
       - name: Archive source changes before compilation
         run: python3 personal/evidence.py source
 
+      - name: Prepare optional Bazel cache
+        id: cache
+        if: github.event_name == 'push' || inputs.use_cache
+        continue-on-error: true
+        env:
+          RECIPE_HASH: ${{ hashFiles('personal/*.py', 'personal/locks.json', 'personal/manifest.xml', 'personal/patches/**', 'personal/lz4/**', 'personal/adios/**', 'personal/modules/**', '.github/actions/**', '.github/workflows/personal-oneplus15.yml', '!**/__pycache__/**') }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          # Include the immutable source/toolchain locks, full recipe and actual
+          # runner image. Never restore an opaque output_user_root or source tree.
+          identity = {key: os.environ.get(key, "") for key in
+                      ["RUNNER_OS", "RUNNER_ARCH", "ImageOS", "ImageVersion", "RECIPE_HASH", "BUILD_VARIANT"]}
+          assert identity["ImageVersion"] and identity["RECIPE_HASH"]
+          digest = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+          prefix = f"personal-bazel-v1-{digest}-"
+          root = Path(os.environ["RUNNER_TEMP"]) / "personal-bazel-cache"
+          for name in ["disk", "repository"]:
+              (root / name).mkdir(parents=True, exist_ok=True)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"prefix={prefix}\nroot={root}\n")
+          Path("evidence/cache-identity.json").write_text(json.dumps(identity, indent=2) + "\n")
+          PY
+
+      - name: Restore Bazel action and download caches
+        id: restore-cache
+        if: steps.cache.outcome == 'success'
+        continue-on-error: true
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: ${{ steps.cache.outputs.root }}
+          key: ${{ steps.cache.outputs.prefix }}${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: ${{ steps.cache.outputs.prefix }}
+
       - name: Build selected kernel and symbols
+        id: compile
         working-directory: kernel
+        env:
+          PERSONAL_CACHE_ROOT: ${{ steps.cache.outcome == 'success' && steps.restore-cache.outcome == 'success' && steps.cache.outputs.root || '' }}
+          CACHE_MATCHED_KEY: ${{ steps.restore-cache.outputs.cache-matched-key }}
+          CACHE_RESTORE_OUTCOME: ${{ steps.restore-cache.outcome }}
         run: |
           set -euo pipefail
           targets=(//common:kernel_aarch64)
+          cache_flags=()
+          if [[ -n "$PERSONAL_CACHE_ROOT" ]]; then
+            cache_flags+=("--disk_cache=$PERSONAL_CACHE_ROOT/disk" "--repository_cache=$PERSONAL_CACHE_ROOT/repository")
+          fi
           if [[ "$BUILD_VARIANT" == "C3" || "$BUILD_VARIANT" == "C" ]]; then
             targets+=(//common:kernel_aarch64_modules)
           fi
-          tools/bazel build --config=fast "${targets[@]}" \
+          started="$(date +%s)"
+          record_build_time() {
+            elapsed=$(( $(date +%s) - started ))
+            jq -n --arg matched "$CACHE_MATCHED_KEY" --arg restore "$CACHE_RESTORE_OUTCOME" \
+              --arg root "$PERSONAL_CACHE_ROOT" --argjson seconds "$elapsed" \
+              '{matched_key:$matched,restore_outcome:$restore,cache_enabled:($root != ""),build_seconds:$seconds}' \
+              > ../evidence/cache-build.json
+          }
+          trap record_build_time EXIT
+          tools/bazel build --config=fast "${cache_flags[@]}" "${targets[@]}" \
             2>&1 | tee ../evidence/build.log
+
+      - name: Measure cache before saving
+        id: cache-size
+        if: always() && !cancelled() && steps.cache.outcome == 'success' && steps.restore-cache.outcome == 'success' && steps.compile.outcome != 'skipped'
+        continue-on-error: true
+        env:
+          PERSONAL_CACHE_ROOT: ${{ steps.cache.outputs.root }}
+        run: |
+          set -euo pipefail
+          # Oversized entries are skipped intact, not pruned into broken CAS/AC pairs.
+          bytes="$(du -sb "$PERSONAL_CACHE_ROOT" | cut -f1)"
+          jq -n --argjson bytes "$bytes" '{bytes:$bytes,max_save_bytes:4294967296}' > evidence/cache-size.json
+          echo "Bazel cache size: $bytes bytes"
+          if (( bytes > 0 && bytes <= 4294967296 )); then
+            echo 'save=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Save bounded Bazel caches
+        if: always() && !cancelled() && steps.cache-size.outcome == 'success' && steps.cache-size.outputs.save == 'true'
+        continue-on-error: true
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: ${{ steps.cache.outputs.root }}
+          key: ${{ steps.cache.outputs.prefix }}${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Package optional C3 extra modules
         if: env.BUILD_VARIANT == 'C3' || env.BUILD_VARIANT == 'C'
@@ -233,10 +341,10 @@ jobs:
       - name: Deliver verified candidate files
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: OnePlus15-${{ env.BUILD_VARIANT }}-6.12.81-4k
+          name: OnePlus15-${{ env.BUILD_VARIANT }}-${{ steps.target.outputs.version }}-${{ steps.target.outputs.page_size }}
           path: deliverables/
           include-hidden-files: true
           retention-days: 30
           if-no-files-found: error
 
-run-name: OnePlus 15 ${{ inputs.variant || (github.ref_name == 'oneplus15-6.12.81-bakasu' && 'A' || 'C1') }}
+run-name: OnePlus 15 ${{ inputs.variant || 'C1' }}

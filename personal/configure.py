@@ -17,6 +17,13 @@ has_bbr3 = variant in {"C2", "C2D2", "C3", "C"}
 bbr3_default = variant in {"C2", "C3", "C"}
 has_root_container = variant in {"C3", "C"}
 locks = json.loads((here / "locks.json").read_text())
+# Verify the source version before making any configuration/source changes.
+make = (common / "Makefile").read_text()
+version = ".".join(re.search(rf"(?m)^{key}\s*=\s*(\d+)\s*$", make).group(1) for key in ["VERSION", "PATCHLEVEL", "SUBLEVEL"])
+assert version == locks["version"], version
+constants = (common / "build.config.constants").read_text()
+for key, value in locks["build_constants"].items():
+    assert re.search(rf"(?m)^{re.escape(key)}={re.escape(str(value))}$", constants), (key, value)
 if variant == "B" or is_c:
     source = here / "adios/adios.c"
     assert hashlib.sha256(source.read_bytes()).hexdigest() == locks["adios"]["sha256"]
@@ -137,15 +144,16 @@ build.write_text(src)
 # Built-in implementations do not produce the module files declared by the
 # stock GKI module list. Remove these entries from the module/system_dlkm list
 # so Kleaf does not require nonexistent zram.ko or zsmalloc.ko outputs.
-modules_bzl = common / "modules.bzl"
-src = modules_bzl.read_text()
-common_list_end = src.index("]\n\n# Deprecated")
-common_list, remainder = src[:common_list_end], src[common_list_end:]
-for relative in ["drivers/block/zram/zram.ko", "mm/zsmalloc.ko"]:
-    entry = f'    "{relative}",\n'
-    assert common_list.count(entry) == 1, relative
-    common_list = common_list.replace(entry, "", 1)
-modules_bzl.write_text(common_list + remainder)
+if is_c:
+    modules_bzl = common / "modules.bzl"
+    src = modules_bzl.read_text()
+    common_list_end = src.index("]\n\n# Deprecated")
+    common_list, remainder = src[:common_list_end], src[common_list_end:]
+    for relative in ["drivers/block/zram/zram.ko", "mm/zsmalloc.ko"]:
+        entry = f'    "{relative}",\n'
+        assert common_list.count(entry) == 1, relative
+        common_list = common_list.replace(entry, "", 1)
+    modules_bzl.write_text(common_list + remainder)
 
 if has_root_container:
     # hci_vhci is deliberately not part of stock GKI. Add its module output
@@ -164,9 +172,5 @@ if has_root_container:
     src = src[:start] + block.replace(target, replacement, 1) + src[end:]
     build.write_text(src)
 
-# Guard source version independently from filenames or workflow input values.
-make = (common / "Makefile").read_text()
-version = ".".join(re.search(rf"(?m)^{key}\s*=\s*(\d+)\s*$", make).group(1) for key in ["VERSION", "PATCHLEVEL", "SUBLEVEL"])
-assert version == locks["version"], version
 assert not list(common.rglob("*.rej")), "Residual patch rejects"
 print(f"Prepared {version} 4K, variant {variant}; scheduler policy retained")

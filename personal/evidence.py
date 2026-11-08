@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Export source provenance; require actual config and linked kernel evidence."""
 import gzip
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -157,8 +158,11 @@ if __name__ == "__main__":
         banner = re.search(rb"Linux version [^\x00\n]+", (output / "Image").read_bytes())
         assert banner, "Kernel version banner absent"
         banner_text = banner.group().decode(errors="replace")
-        assert "6.12.81-android16" in banner_text, banner_text
+        expected_banner = f"Linux version {locks['version']}-{locks['target'].split('-')[0]}-{locks['build_constants']['KMI_GENERATION']}-Personal{variant}"
+        assert banner_text.startswith(expected_banner + " "), banner_text
         assert f"Personal{variant}" in banner_text, banner_text
+        expected_time = datetime.fromtimestamp(locks["source_date_epoch"], timezone.utc).strftime("%a %b %e %H:%M:%S UTC %Y")
+        assert banner_text.endswith(expected_time), ("Unexpected build timestamp", banner_text)
         shutil.copy2(cfg, evidence / "final.config")
         shutil.copy2(output / "System.map", evidence / "System.map")
         shutil.copy2(output / "kernel_aarch64_Module.symvers", evidence / "Module.symvers")
@@ -171,7 +175,7 @@ if __name__ == "__main__":
         shutil.copy2(output / "Image", delivery / "Image")
         ak = workspace / "AnyKernel3"
         shutil.copy2(output / "Image", ak / "Image")
-        package = delivery / f"OnePlus15-{variant}-6.12.81-android16-4k-AnyKernel3.zip"
+        package = delivery / f"OnePlus15-{variant}-{locks['version']}-{locks['target'].split('-')[0]}-{locks['page_size']}-AnyKernel3.zip"
         with zipfile.ZipFile(package, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
             for file in sorted(ak.rglob("*")):
                 rel = file.relative_to(ak)
@@ -183,6 +187,11 @@ if __name__ == "__main__":
         record = {"variant": variant, "banner": banner_text, "compiler_versions": versions,
                   "final_config_sha256": sha(cfg), "required_config": required,
                   "upstream_release": locks["upstream_release"], "wild_commit": locks["wild"],
+                  "kernel_version": locks["version"], "source_commit": locks["common"],
+                  "source_manifest": locks["manifest"], "source_superproject": locks["superproject"],
+                  "source_date_epoch": locks["source_date_epoch"],
+                  "source_commit_epoch": locks["source_commit_epoch"],
+                  "vendor_module_abi_verified": False,
                   "nomount_protocol": locks["nomount_protocol"],
                   "embedded_config_matches_final": True,
                   "device_tested": False, "allow_version_mismatch": False}

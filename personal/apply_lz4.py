@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Apply the pinned LZ4 1.10 and LZ4K/LZ4KD source chain."""
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -9,7 +10,10 @@ import subprocess
 import tempfile
 
 here = Path(__file__).resolve().parent
-common = here.parent / "kernel/common"
+p = argparse.ArgumentParser()
+p.add_argument("--kernel", type=Path, default=here.parent / "kernel/common")
+a = p.parse_args()
+common = a.kernel.resolve()
 locks = json.loads((here / "locks.json").read_text())
 locked = locks["lz4_patches"]
 backend_locks = locks["lz4_backends"]
