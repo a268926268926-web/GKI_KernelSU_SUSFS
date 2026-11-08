@@ -1,0 +1,124 @@
+diff --git a/include/net/net_namespace.h b/include/net/net_namespace.h
+--- a/include/net/net_namespace.h
++++ b/include/net/net_namespace.h
+@@ -144,9 +144,6 @@
+ 	struct netns_nf		nf;
+ #if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE)
+ 	struct netns_ct		ct;
+-#endif
+-#if defined(CONFIG_NF_TABLES) || defined(CONFIG_NF_TABLES_MODULE)
+-	struct netns_nftables	nft;
+ #endif
+ #if IS_ENABLED(CONFIG_NF_FLOW_TABLE)
+ 	struct netns_ft ft;
+diff --git a/include/net/netfilter/nf_tables.h b/include/net/netfilter/nf_tables.h
+--- a/include/net/netfilter/nf_tables.h
++++ b/include/net/netfilter/nf_tables.h
+@@ -1542,6 +1542,9 @@
+ 
+ #if IS_ENABLED(CONFIG_NF_TABLES)
+ 
++/* NFT state lives in its existing per-net allocation to preserve GKI layout. */
++static inline struct netns_nftables *nft_netns(const struct net *net);
++
+ /*
+  * The gencursor defines two generations, the currently active and the
+  * next one. Objects contain a bitmask of 2 bits specifying the generations
+@@ -1556,7 +1559,7 @@
+  */
+ static inline unsigned int nft_gencursor_next(const struct net *net)
+ {
+-	return net->nft.gencursor + 1 == 1 ? 1 : 0;
++	return nft_netns(net)->gencursor + 1 == 1 ? 1 : 0;
+ }
+ 
+ static inline u8 nft_genmask_next(const struct net *net)
+@@ -1567,7 +1570,7 @@
+ static inline u8 nft_genmask_cur(const struct net *net)
+ {
+ 	/* Use READ_ONCE() to prevent refetching the value for atomicity */
+-	return 1 << READ_ONCE(net->nft.gencursor);
++	return 1 << READ_ONCE(nft_netns(net)->gencursor);
+ }
+ 
+ #define NFT_GENMASK_ANY		((1 << 0) | (1 << 1))
+@@ -1937,6 +1940,7 @@
+ 	unsigned int		gc_seq;
+ 	u8			validate_state;
+ 	struct work_struct	destroy_work;
++	struct netns_nftables	nft;
+ };
+ 
+ extern unsigned int nf_tables_net_id;
+@@ -1944,6 +1948,11 @@
+ static inline struct nftables_pernet *nft_pernet(const struct net *net)
+ {
+ 	return net_generic(net, nf_tables_net_id);
++}
++
++static inline struct netns_nftables *nft_netns(const struct net *net)
++{
++	return &nft_pernet(net)->nft;
+ }
+ 
+ static inline u64 nft_net_tstamp(const struct net *net)
+diff --git a/net/netfilter/nf_tables_api.c b/net/netfilter/nf_tables_api.c
+--- a/net/netfilter/nf_tables_api.c
++++ b/net/netfilter/nf_tables_api.c
+@@ -1019,7 +1019,7 @@
+ 
+ static unsigned int nft_base_seq(const struct net *net)
+ {
+-	return READ_ONCE(net->nft.base_seq);
++	return READ_ONCE(nft_netns(net)->base_seq);
+ }
+ 
+ static __be16 nft_base_seq_be16(const struct net *net)
+@@ -10530,12 +10530,12 @@
+ 		;
+ 
+ 	/* pairs with smp_load_acquire in nft_lookup_eval */
+-	smp_store_release(&net->nft.base_seq, base_seq);
++	smp_store_release(&nft_netns(net)->base_seq, base_seq);
+ 
+ 	gc_seq = nft_gc_seq_begin(nft_net);
+ 
+ 	/* step 3. Start new generation, rules_gen_X now in use. */
+-	net->nft.gencursor = nft_gencursor_next(net);
++	nft_netns(net)->gencursor = nft_gencursor_next(net);
+ 
+ 	list_for_each_entry_safe(trans, next, &nft_net->commit_list, list) {
+ 		struct nft_table *table = trans->table;
+@@ -11773,7 +11773,7 @@
+ 	INIT_LIST_HEAD(&nft_net->module_list);
+ 	INIT_LIST_HEAD(&nft_net->notify_list);
+ 	mutex_init(&nft_net->commit_mutex);
+-	net->nft.base_seq = 1;
++	nft_netns(net)->base_seq = 1;
+ 	nft_net->gc_seq = 0;
+ 	nft_net->validate_state = NFT_VALIDATE_SKIP;
+ 	INIT_WORK(&nft_net->destroy_work, nf_tables_trans_destroy_work);
+diff --git a/net/netfilter/nf_tables_core.c b/net/netfilter/nf_tables_core.c
+--- a/net/netfilter/nf_tables_core.c
++++ b/net/netfilter/nf_tables_core.c
+@@ -259,7 +259,7 @@
+ 	struct nft_regs regs;
+ 	unsigned int stackptr = 0;
+ 	struct nft_jumpstack jumpstack[NFT_JUMP_STACK_SIZE];
+-	bool genbit = READ_ONCE(net->nft.gencursor);
++	bool genbit = READ_ONCE(nft_netns(net)->gencursor);
+ 	struct nft_rule_blob *blob;
+ 	struct nft_traceinfo info;
+ 
+diff --git a/net/netfilter/nft_lookup.c b/net/netfilter/nft_lookup.c
+--- a/net/netfilter/nft_lookup.c
++++ b/net/netfilter/nft_lookup.c
+@@ -58,7 +58,7 @@
+ static unsigned int nft_base_seq(const struct net *net)
+ {
+ 	/* pairs with smp_store_release() in nf_tables_commit() */
+-	return smp_load_acquire(&net->nft.base_seq);
++	return smp_load_acquire(&nft_netns(net)->base_seq);
+ }
+ 
+ static bool nft_lookup_should_retry(const struct net *net, unsigned int seq)

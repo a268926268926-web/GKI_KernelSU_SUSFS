@@ -41,6 +41,8 @@ for file, expected in locks["lz4_backends"]["files"].items():
     assert hashlib.file_digest(backend.open("rb"), "sha256").hexdigest() == expected
 bbr3 = here / "patches/network/0001-net-tcp-backport-BBRv3-to-android16-6.12.patch"
 assert hashlib.file_digest(bbr3.open("rb"), "sha256").hexdigest() == locks["network_patches"]["bbrv3"]["sha256"]
+nft = locks["network_patches"]["nft_pernet"]
+assert hashlib.sha256((here / "patches/network" / nft["path"]).read_bytes()).hexdigest() == nft["sha256"]
 projects = ET.parse(here / "manifest.xml").findall("project")
 assert len(projects) == locks["source_project_count"]
 assert len({p.get("path", p.get("name")) for p in projects}) == len(projects)
@@ -79,6 +81,8 @@ variants = triggers["workflow_dispatch"]["inputs"]["variant"]["options"]
 assert {"C1", "C2", "C2D1", "C2D2", "C3", "C"} <= set(variants)
 assert any(s.get("name") == "Apply locked LZ4 source chain" for s in data["jobs"]["build"]["steps"])
 assert any(s.get("name") == "Apply locked BBRv3 source backport" for s in data["jobs"]["build"]["steps"])
+assert any(s.get("name") == "Preserve public network namespace layout for NFT" and
+           s.get("run") == "python3 personal/apply_nft_compat.py" for s in data["jobs"]["build"]["steps"])
 assert any(s.get("name") == "Apply locked Re:Kernel source integration" for s in data["jobs"]["build"]["steps"])
 assert any(s.get("name") == "Require prior successful C stage" for s in data["jobs"]["build"]["steps"])
 build_step = next(s for s in data["jobs"]["build"]["steps"] if s.get("id") == "compile")

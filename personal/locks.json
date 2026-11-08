@@ -37,6 +37,12 @@
       "commit": "fa76c90e2cb284e6ce22b0b008ad4dd19820dbb1",
       "path": "common/bbrv3/0001-net-tcp-backport-BBRv3-to-android16-6.12.patch",
       "sha256": "cbdfcb6f6c3573dc5e93644218ff425434b5b1d7cd764536ab6aa8eed5cefd62"
+    },
+    "nft_pernet": {
+      "path": "0002-netfilter-keep-nft-state-out-of-struct-net.patch",
+      "base_common": "c52ce393bbcf08333df7409b155773174f7cfbe1",
+      "origin": "personal compatibility patch: existing nftables_pernet storage",
+      "sha256": "813ee65fef519cce6124317f1023b94b7adcd38c4bc445bebec028d04a294830"
     }
   },
   "components": {

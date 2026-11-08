@@ -102,10 +102,20 @@ No unverified claim is made that R22 fixed Baseband Guard/relock compatibility.
 
 Deliver and validate **C1 -> C2 -> C3 -> final C**. C2D1/C2D2 are historical
 diagnostic options, not extra delivery stages. A prior successful CI build is
-only a build dependency, not device acceptance. C2's recorded vendor-module
-ABI regression remains unresolved; update the driver snapshot for the actual
-ROM and resolve it before another phone test. B's slow boot also remains an
-open measurement question. Do not change selected features to hide either issue.
+only a build dependency, not device acceptance. C2 moves the NFT generation
+state into its existing `nftables_pernet` allocation, leaving `struct net`
+unchanged even with NF_TABLES enabled. All eight accesses retain their original
+memory ordering. The network namespace framework allocates this storage before
+NFT initialization and frees it after hook teardown and the RCU grace period.
+No CRC, vermagic or force-load bypass is added. Selected NFT features stay
+built in; future NFT modules using generation helpers would need an explicit
+review of the currently unexported `nf_tables_net_id` dependency.
+
+This addresses the known layout cause, but the complete C2 image must still
+pass the actual ROM's vendor-module checks and device testing. C1 6.12.96 has
+passed a single device boot and ZRAM round-trip test; B's historical slow boot
+remains an open measurement question. Do not change selected features to hide
+either issue.
 
 Re-Kernel remains a selected C3 capability. It reports events to compatible
 userspace clients; it does not choose or freeze apps by itself. A third-party

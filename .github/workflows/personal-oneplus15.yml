@@ -220,6 +220,10 @@ jobs:
         if: env.BUILD_VARIANT == 'C2' || env.BUILD_VARIANT == 'C2D2' || env.BUILD_VARIANT == 'C3' || env.BUILD_VARIANT == 'C'
         run: python3 personal/apply_network.py
 
+      - name: Preserve public network namespace layout for NFT
+        if: env.BUILD_VARIANT == 'C2' || env.BUILD_VARIANT == 'C2D1' || env.BUILD_VARIANT == 'C2D2' || env.BUILD_VARIANT == 'C3' || env.BUILD_VARIANT == 'C'
+        run: python3 personal/apply_nft_compat.py
+
       - name: Apply locked Re:Kernel source integration
         if: env.BUILD_VARIANT == 'C3' || env.BUILD_VARIANT == 'C'
         run: python3 personal/apply_rekernel.py
