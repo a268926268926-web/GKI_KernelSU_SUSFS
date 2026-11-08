@@ -102,7 +102,21 @@ No unverified claim is made that R22 fixed Baseband Guard/relock compatibility.
 
 Deliver and validate **C1 -> C2 -> C3 -> final C**. C2D1/C2D2 are historical
 diagnostic options, not extra delivery stages. A prior successful CI build is
-only a build dependency, not device acceptance. C2 moves the NFT generation
+only a build dependency, not device acceptance.
+
+The daily network policy approved after the 2026-11-09 C2 phone comparisons
+uses BBRv1 (`bbr`) by default in C2, C3 and final C. BBRv3 and PIE remain
+built in for optional selection; Vegas and NV are disabled in these production
+candidates. Historical C2D1/C2D2 diagnostic recipes retain their experimental
+algorithm availability. Existing archived packages and test results describe
+their original configuration and are not rewritten by this policy change.
+PIE is not automatically attached to physical interfaces. The kernel default
+sets a fallback for new TCP sockets; applications, route policy, listeners and
+userspace controls can choose differently. A userspace control module is
+optional and cannot provide an algorithm omitted from the kernel. Treat
+network-type presets and measured automatic selection as separate features.
+
+C2 moves the NFT generation
 state into its existing `nftables_pernet` allocation, leaving `struct net`
 unchanged even with NF_TABLES enabled. All eight accesses retain their original
 memory ordering. The network namespace framework allocates this storage before

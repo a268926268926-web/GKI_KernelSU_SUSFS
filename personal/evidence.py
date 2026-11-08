@@ -22,7 +22,9 @@ locks = json.loads((here / "locks.json").read_text())
 variant = os.environ.get("BUILD_VARIANT", "A")
 has_network = variant in {"C2", "C2D1", "C2D2", "C3", "C"}
 has_bbr3 = variant in {"C2", "C2D2", "C3", "C"}
-bbr3_default = variant in {"C2", "C3", "C"}
+# Keep the production candidate acceptance in sync with the approved daily
+# BBRv1 default. BBRv3 remains available, independently of its default choice.
+bbr3_default = False
 def git(path, *args):
     return subprocess.check_output(["git", "-C", str(path), *args])
 def sha(path):
@@ -73,7 +75,8 @@ def require_config(config):
     if has_network:
         required.update({
             "CONFIG_TCP_CONG_BBR": "y",
-            "CONFIG_TCP_CONG_VEGAS": "y", "CONFIG_TCP_CONG_NV": "y",
+            "CONFIG_TCP_CONG_VEGAS": "y" if variant in {"C2D1", "C2D2"} else "n",
+            "CONFIG_TCP_CONG_NV": "y" if variant in {"C2D1", "C2D2"} else "n",
             "CONFIG_DEFAULT_CUBIC": "n",
             "CONFIG_NF_TABLES": "y", "CONFIG_NF_TABLES_INET": "y",
             "CONFIG_NF_TABLES_IPV4": "y", "CONFIG_NF_TABLES_IPV6": "y",

@@ -14,7 +14,9 @@ assert variant in {"A", "B", "C1", "C2", "C2D1", "C2D2", "C3", "C"}
 is_c = variant.startswith("C")
 has_network = variant in {"C2", "C2D1", "C2D2", "C3", "C"}
 has_bbr3 = variant in {"C2", "C2D2", "C3", "C"}
-bbr3_default = variant in {"C2", "C3", "C"}
+# Daily policy approved after the 2026-11-09 device comparisons: BBRv1
+# defaults, with BBRv3 retained for explicit runtime selection.
+bbr3_default = False
 has_root_container = variant in {"C3", "C"}
 locks = json.loads((here / "locks.json").read_text())
 # Verify the source version before making any configuration/source changes.
@@ -79,8 +81,8 @@ if is_c:
 if has_network:
     required.update({
         "CONFIG_TCP_CONG_BBR": "y",
-        "CONFIG_TCP_CONG_VEGAS": "y",
-        "CONFIG_TCP_CONG_NV": "y",
+        "CONFIG_TCP_CONG_VEGAS": "y" if variant in {"C2D1", "C2D2"} else "n",
+        "CONFIG_TCP_CONG_NV": "y" if variant in {"C2D1", "C2D2"} else "n",
         "CONFIG_DEFAULT_CUBIC": "n",
         "CONFIG_NF_TABLES": "y",
         "CONFIG_NF_TABLES_INET": "y",
