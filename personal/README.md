@@ -37,6 +37,9 @@ page-size choices and stage; changed identities start cold. `use_cache=false`
 on a manual run bypasses this cache. Entries larger than 4 GiB are not saved;
 cache restore/save errors do not replace compilation or fail a valid build.
 Cache identity, restored key, size and build duration are exported as evidence.
+CI uses standard sandbox execution: Kleaf's `--config=fast` implies `local`,
+which prevents Bazel from caching the main KernelBuild action. The Bazel
+profile is exported to distinguish actual execution from cache reuse.
 An empty first cache cannot speed up the first build, and a changed kernel
 configuration may invalidate the whole kernel action. No CCTV ccache archive,
 entire output tree, source tree or Release bucket is imported.

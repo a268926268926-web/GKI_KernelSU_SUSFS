@@ -247,9 +247,10 @@ jobs:
           # runner image. Never restore an opaque output_user_root or source tree.
           identity = {key: os.environ.get(key, "") for key in
                       ["RUNNER_OS", "RUNNER_ARCH", "ImageOS", "ImageVersion", "RECIPE_HASH", "BUILD_VARIANT"]}
+          identity["execution_mode"] = "sandbox"
           assert identity["ImageVersion"] and identity["RECIPE_HASH"]
           digest = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
-          prefix = f"personal-bazel-v1-{digest}-"
+          prefix = f"personal-bazel-v2-{digest}-"
           root = Path(os.environ["RUNNER_TEMP"]) / "personal-bazel-cache"
           for name in ["disk", "repository"]:
               (root / name).mkdir(parents=True, exist_ok=True)
@@ -294,7 +295,9 @@ jobs:
               > ../evidence/cache-build.json
           }
           trap record_build_time EXIT
-          tools/bazel build --config=fast "${cache_flags[@]}" "${targets[@]}" \
+          # fast implies local, whose LOCAL tag forbids caching KernelBuild.
+          # Use standard sandbox execution so the main kernel action is cacheable.
+          tools/bazel build "${cache_flags[@]}" --profile=../evidence/bazel-profile.json.gz "${targets[@]}" \
             2>&1 | tee ../evidence/build.log
 
       - name: Measure cache before saving

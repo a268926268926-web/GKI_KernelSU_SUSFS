@@ -191,6 +191,7 @@ if __name__ == "__main__":
                   "source_manifest": locks["manifest"], "source_superproject": locks["superproject"],
                   "source_date_epoch": locks["source_date_epoch"],
                   "source_commit_epoch": locks["source_commit_epoch"],
+                  "build_execution_mode": "sandbox",
                   "vendor_module_abi_verified": False,
                   "nomount_protocol": locks["nomount_protocol"],
                   "embedded_config_matches_final": True,

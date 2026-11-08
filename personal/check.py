@@ -81,5 +81,8 @@ assert any(s.get("name") == "Apply locked LZ4 source chain" for s in data["jobs"
 assert any(s.get("name") == "Apply locked BBRv3 source backport" for s in data["jobs"]["build"]["steps"])
 assert any(s.get("name") == "Apply locked Re:Kernel source integration" for s in data["jobs"]["build"]["steps"])
 assert any(s.get("name") == "Require prior successful C stage" for s in data["jobs"]["build"]["steps"])
+build_step = next(s for s in data["jobs"]["build"]["steps"] if s.get("id") == "compile")
+assert "--config=fast" not in build_step["run"] and "--config=local" not in build_step["run"], "LOCAL KernelBuild cannot use the disk cache"
+assert "--disk_cache=" in build_step["run"] and "--repository_cache=" in build_step["run"]
 assert locks["components"]["Re-Kernel"]["commit"] == "ac08296174d7fb2801c0eee1084f067a34f8a0fe"
 print(f"PASS: {shells} workflow shell blocks, local action inputs, Python syntax, {len(projects)} immutable project pins, R22/LTS96 source contracts, config failure gates, stage dependencies")
