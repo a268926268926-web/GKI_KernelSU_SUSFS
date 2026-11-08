@@ -1,0 +1,242 @@
+name: OnePlus 15 locked staged build
+
+on:
+  push:
+    branches: [oneplus15-6.12.81-bakasu, oneplus15-6.12.81-c, oneplus15-6.12.81-r22]
+    paths: [personal/**, .github/workflows/personal-oneplus15.yml]
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: A/B baseline or staged C feature build
+        type: choice
+        options: [A, B, C1, C2, C2D1, C2D2, C3, C]
+        default: A
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: personal-oneplus15-${{ github.ref }}-${{ inputs.variant || (github.ref_name == 'oneplus15-6.12.81-bakasu' && 'A' || 'C1') }}
+  cancel-in-progress: false
+
+env:
+  BUILD_VARIANT: ${{ inputs.variant || (github.ref_name == 'oneplus15-6.12.81-bakasu' && 'A' || 'C1') }}
+  SOURCE_DATE_EPOCH: '1780633200'
+  KBUILD_BUILD_TIMESTAMP: Fri Jun 05 04:20:00 UTC 2026
+  KBUILD_BUILD_USER: kleaf
+  KBUILD_BUILD_HOST: build-host
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Require successful A before B
+        if: env.BUILD_VARIANT == 'B'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/personal-oneplus15.yml/runs?head_sha=${GITHUB_SHA}&status=success&per_page=100" \
+            --jq '.workflow_runs[] | select(.display_title == "OnePlus 15 A") | .id' > /tmp/prior-a-runs
+          test -s /tmp/prior-a-runs
+
+      - name: Require prior successful C stage
+        if: env.BUILD_VARIANT == 'C2' || env.BUILD_VARIANT == 'C2D1' || env.BUILD_VARIANT == 'C2D2' || env.BUILD_VARIANT == 'C3' || env.BUILD_VARIANT == 'C'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          case "$BUILD_VARIANT" in
+            C2|C2D1|C2D2) prior=C1 ;;
+            C3) prior=C2 ;;
+            C)  prior=C3 ;;
+          esac
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/personal-oneplus15.yml/runs?head_sha=${GITHUB_SHA}&status=success&per_page=100" \
+            --jq '.workflow_runs[].display_title' > /tmp/prior-c-runs
+          grep -Fx "OnePlus 15 $prior" /tmp/prior-c-runs
+
+      - name: Free runner disk
+        uses: endersonmenezes/free-disk-space@d8d1e404d2314ff42e5393ba5545d192ae63afd4 # v4
+        with:
+          remove_android: true
+          remove_dotnet: true
+          remove_haskell: true
+          remove_tool_cache: true
+          remove_swap: true
+
+      - name: Swap for ThinLTO
+        uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761
+        with:
+          swap-size-gb: 16
+
+      - name: Prepare tools and locked manifest
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq git curl zip rsync flex bison libelf-dev libssl-dev python3 python3-yaml
+          mkdir -p kernel evidence deliverables git-repo
+          cp personal/locks.json personal/manifest.xml evidence/
+          jq -n --arg runner "$ImageOS/$ImageVersion" --arg commit "$GITHUB_SHA" \
+            --arg variant "$BUILD_VARIANT" --arg run "$GITHUB_RUN_ID" \
+            '{runner:$runner,workflow_commit:$commit,variant:$variant,run:$run}' > evidence/build-context.json
+          repo_sha="$(jq -r .repo_tool personal/locks.json)"
+          curl -fLsS --retry 3 "https://gerrit.googlesource.com/git-repo/+/${repo_sha}/repo?format=TEXT" | base64 -d > git-repo/repo
+          chmod +x git-repo/repo
+          echo "$GITHUB_WORKSPACE/git-repo" >> "$GITHUB_PATH"
+          git -C personal init --initial-branch=locked
+          git -C personal -c user.name=builder -c user.email=builder@localhost add manifest.xml
+          git -C personal -c user.name=builder -c user.email=builder@localhost commit -m 'Pinned manifest'
+
+      - name: Check personal workflow and locked source contracts
+        run: /usr/bin/python3 personal/check.py
+
+      - name: Sync exact source snapshot
+        working-directory: kernel
+        run: |
+          set -euo pipefail
+          repo_sha="$(jq -r .repo_tool ../personal/locks.json)"
+          repo init -u "$GITHUB_WORKSPACE/personal" -b locked -m manifest.xml --depth=1 \
+            --repo-rev="$repo_sha" --no-repo-verify
+          repo sync -c --no-tags --no-clone-bundle --fail-fast -j4
+          repo manifest -r -o "$GITHUB_WORKSPACE/evidence/resolved-manifest.xml"
+          python3 ../personal/verify_manifest.py
+
+      - name: Fetch locked components and native SUSFS integration
+        run: python3 personal/setup.py
+
+      - name: Networking and firewall
+        uses: ./.github/actions/networking-config
+      - name: CIFS
+        uses: ./.github/actions/cifs
+        with:
+          version: android16-6.12
+      - name: Container support
+        uses: ./.github/actions/droidspaces
+        with:
+          version: android16-6.12
+          android_version: android16
+          kernel_version: '6.12'
+          sublevel: '81'
+          os_patch_level: '2026-06'
+          droidspaces_commit: 847ecdd2c9431f3fa69647eed4060738275aeece
+      - name: NTSync
+        uses: ./.github/actions/ntsync
+        with:
+          version: android16-6.12
+          kernel_version: '6.12'
+          sublevel: '81'
+      - name: Unicode compatibility
+        uses: ./.github/actions/unicode-fix
+        with:
+          kernel_version: '6.12'
+      - name: Miscellaneous baseline config
+        uses: ./.github/actions/misc
+        with:
+          version: android16-6.12
+          android_version: android16
+          kernel_version: '6.12'
+          sublevel: '81'
+          variant: BakaSU
+      - name: BTF, eBPF and FUSE-BPF
+        uses: ./.github/actions/btf
+        with:
+          version: android16-6.12
+          kernel_version: '6.12'
+          sublevel: '81'
+      - name: SUSFS feature configuration
+        uses: ./.github/actions/susfs-config
+      - name: NoMount and Baseband Guard configuration
+        uses: ./.github/actions/set-kernel-config
+        with:
+          config_list: |
+            CONFIG_NOMOUNT=y
+            CONFIG_BBG=y
+      - name: Add Baseband Guard to default LSM list
+        run: |
+          set -euo pipefail
+          sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' kernel/common/security/Kconfig
+          grep -q 'selinux,baseband_guard' kernel/common/security/Kconfig
+      - name: Kernel host compatibility
+        uses: ./.github/actions/kernel-fixes
+        with:
+          version: android16-6.12
+          android_version: android16
+          kernel_version: '6.12'
+          sublevel: '81'
+          os_patch_level: '2026-06'
+      - name: Branding with KMI generation retained
+        uses: ./.github/actions/apply-kernel-branding
+        with:
+          variant: BakaSU
+          kernel_version: '6.12'
+          android_version: android16
+          version: android16-6.12
+          sublevel: '81'
+          brand_name: Personal${{ env.BUILD_VARIANT }}
+          keep_kmi: 'true'
+      - name: Wild module export policy
+        uses: ./.github/actions/remove-protected-exports
+
+      - name: Apply locked LZ4 source chain
+        if: startsWith(env.BUILD_VARIANT, 'C')
+        run: python3 personal/apply_lz4.py
+
+      - name: Apply locked BBRv3 source backport
+        if: env.BUILD_VARIANT == 'C2' || env.BUILD_VARIANT == 'C2D2' || env.BUILD_VARIANT == 'C3' || env.BUILD_VARIANT == 'C'
+        run: python3 personal/apply_network.py
+
+      - name: Apply locked Re:Kernel source integration
+        if: env.BUILD_VARIANT == 'C3' || env.BUILD_VARIANT == 'C'
+        run: python3 personal/apply_rekernel.py
+
+      - name: Assert version and final requested choices
+        run: python3 personal/configure.py
+
+      - name: Archive source changes before compilation
+        run: python3 personal/evidence.py source
+
+      - name: Build selected kernel and symbols
+        working-directory: kernel
+        run: |
+          set -euo pipefail
+          targets=(//common:kernel_aarch64)
+          if [[ "$BUILD_VARIANT" == "C3" || "$BUILD_VARIANT" == "C" ]]; then
+            targets+=(//common:kernel_aarch64_modules)
+          fi
+          tools/bazel build --config=fast "${targets[@]}" \
+            2>&1 | tee ../evidence/build.log
+
+      - name: Package optional C3 extra modules
+        if: env.BUILD_VARIANT == 'C3' || env.BUILD_VARIANT == 'C'
+        run: python3 personal/package_extra_modules.py
+
+      - name: Verify real config, native symbols and deliverable hashes
+        run: python3 personal/evidence.py package
+
+      - name: Preserve evidence including failures
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: OnePlus15-${{ env.BUILD_VARIANT }}-evidence
+          path: evidence/
+          include-hidden-files: true
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Deliver verified candidate files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: OnePlus15-${{ env.BUILD_VARIANT }}-6.12.81-4k
+          path: deliverables/
+          include-hidden-files: true
+          retention-days: 30
+          if-no-files-found: error
+
+run-name: OnePlus 15 ${{ inputs.variant || (github.ref_name == 'oneplus15-6.12.81-bakasu' && 'A' || 'C1') }}
