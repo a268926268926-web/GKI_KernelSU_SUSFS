@@ -227,6 +227,9 @@ jobs:
       - name: Assert version and final requested choices
         run: python3 personal/configure.py
 
+      - name: Stabilize component metadata and Bazel source inputs
+        run: python3 personal/stabilize_inputs.py
+
       - name: Archive source changes before compilation
         run: python3 personal/evidence.py source
 

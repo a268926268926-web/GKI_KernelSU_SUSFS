@@ -144,6 +144,14 @@ if __name__ == "__main__":
         required = require_config(config_values(cfg.read_text()))
         assert not list(common.rglob("*.rej"))
         log = (evidence / "build.log").read_text(errors="replace")
+        stable = json.loads((evidence / "stable-inputs.json").read_text())
+        for name in ["NoMount", "Baseband-guard"]:
+            assert stable["components"][name]["head"] == locks["components"][name]["commit"]
+        for relative, hashes in stable["files"].items():
+            assert sha(workspace / relative) == hashes["after_sha256"], ("Build inputs changed", relative)
+        bbg = locks["components"]["Baseband-guard"]
+        assert set(re.findall(r"-- BBG version: (\S+)", log)) == {bbg["commit"][:8]}
+        assert set(re.findall(r"-- BBG repo: (\S+)", log)) == {bbg["url"].removesuffix(".git")}
         assert "KSU_NO_PREINIT" not in log and "preinit disabled" not in log, "Native preinit disabled"
         versions = re.findall(r"-- BakaSU version code: (\d+)", log)
         assert versions and set(versions) == {str(locks["manager"]["version_code"])}, ("Unexpected driver version", versions)

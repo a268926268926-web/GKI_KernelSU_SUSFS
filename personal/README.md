@@ -40,6 +40,13 @@ Cache identity, restored key, size and build duration are exported as evidence.
 CI uses standard sandbox execution: Kleaf's `--config=fast` implies `local`,
 which prevents Bazel from caching the main KernelBuild action. The Bazel
 profile is exported to distinguish actual execution from cache reuse.
+Before compilation, `stabilize_inputs.py` excludes nested Git metadata from
+the source filegroup and resolves NoMount/BBG version metadata from their
+locked checkouts. Their Git repositories remain available for provenance;
+clone timestamps and reflogs must not invalidate the kernel action. The
+resolved metadata and modified-file hashes are recorded in
+`stable-inputs.json`. A restored Actions cache alone is not proof of a main
+KernelBuild hit; compare the profile and build duration on the same recipe.
 An empty first cache cannot speed up the first build, and a changed kernel
 configuration may invalidate the whole kernel action. No CCTV ccache archive,
 entire output tree, source tree or Release bucket is imported.
