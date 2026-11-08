@@ -134,6 +134,20 @@ either issue.
 Re-Kernel remains a selected C3 capability. It reports events to compatible
 userspace clients; it does not choose or freeze apps by itself. A third-party
 freezer is optional and should be evaluated separately from kernel support.
+The 6.12.96 integration anchors Signal reporting only inside
+`do_send_sig_info`, avoiding the upstream script's extra process-group report
+before its target is assigned. Its Binder async update check retains the native
+`frozen` state while adding cgroup/jobctl freezing. All event insertion points
+are asserted before compilation; missing anchors must fail the build.
+
+For this C3 refinement the stage gate may reuse the device-tested C2 run
+`42499401579` at `ae5dd5c162eba768de86aafda75c6b166c6dcc98`. It verifies
+the actual successful run, Git ancestry and the seven explicitly approved
+configuration/integration/workflow paths. Any source lock, manifest, component,
+patch or action change rejects reuse. The gate archives its decision in
+`evidence/stage-gate.json`; all other stage dependencies retain the same-commit
+requirement. The combined C3 candidate still needs its own artifact and device
+acceptance.
 
 For maintenance, update a compatible component set on an isolated branch,
 including its manifest, superproject, toolchain and source timestamp. Review

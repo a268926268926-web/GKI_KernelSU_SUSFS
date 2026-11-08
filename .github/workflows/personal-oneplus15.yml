@@ -81,14 +81,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          case "$BUILD_VARIANT" in
-            C2|C2D1|C2D2) prior=C1 ;;
-            C3) prior=C2 ;;
-            C)  prior=C3 ;;
-          esac
-          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/personal-oneplus15.yml/runs?head_sha=${GITHUB_SHA}&status=success&per_page=100" \
-            --jq '.workflow_runs[].display_title' > /tmp/prior-c-runs
-          grep -Fx "OnePlus 15 $prior" /tmp/prior-c-runs
+          python3 personal/stage_gate.py
 
       - name: Free runner disk
         uses: endersonmenezes/free-disk-space@d8d1e404d2314ff42e5393ba5545d192ae63afd4 # v4

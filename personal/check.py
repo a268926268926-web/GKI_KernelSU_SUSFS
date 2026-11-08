@@ -85,6 +85,65 @@ assert any(s.get("name") == "Preserve public network namespace layout for NFT" a
            s.get("run") == "python3 personal/apply_nft_compat.py" for s in data["jobs"]["build"]["steps"])
 assert any(s.get("name") == "Apply locked Re:Kernel source integration" for s in data["jobs"]["build"]["steps"])
 assert any(s.get("name") == "Require prior successful C stage" for s in data["jobs"]["build"]["steps"])
+stage_step = next(s for s in data["jobs"]["build"]["steps"] if s.get("name") == "Require prior successful C stage")
+assert "python3 personal/stage_gate.py" in stage_step["run"]
+assert stage_step["if"] == "env.BUILD_VARIANT == 'C2' || env.BUILD_VARIANT == 'C2D1' || env.BUILD_VARIANT == 'C2D2' || env.BUILD_VARIANT == 'C3' || env.BUILD_VARIANT == 'C'"
+stage_spec = importlib.util.spec_from_file_location("stage_gate", here / "stage_gate.py")
+stage_gate = importlib.util.module_from_spec(stage_spec)
+stage_spec.loader.exec_module(stage_gate)
+# Fixed API metadata is a local contract fixture, not evidence of a live API
+# call. The CI gate always queries GitHub before accepting this baseline.
+tested_c2 = {
+    "id": 42499401579, "display_title": "OnePlus 15 C2", "status": "completed",
+    "conclusion": "success", "head_sha": "ae5dd5c162eba768de86aafda75c6b166c6dcc98",
+    "repository": {"full_name": "a268926268926-web/GKI_KernelSU_SUSFS"},
+    "path": ".github/workflows/personal-oneplus15.yml",
+}
+assert stage_gate.require_reusable_c2("C3", tested_c2, stage_gate.ALLOWED_C3_PATHS)["id"] == tested_c2["id"]
+
+def rejects_stage_gate(operation):
+    try:
+        operation()
+    except (ValueError, subprocess.CalledProcessError):
+        return
+    raise AssertionError("Invalid stage dependency was accepted")
+
+for field, invalid in {
+    "id": 42499401580, "display_title": "OnePlus 15 C2D2", "status": "in_progress",
+    "conclusion": "failure", "head_sha": "0" * 40,
+    "repository": {"full_name": "another-user/GKI_KernelSU_SUSFS"},
+    "path": ".github/workflows/other.yml",
+}.items():
+    bad_run = copy.deepcopy(tested_c2)
+    bad_run[field] = invalid
+    rejects_stage_gate(lambda: stage_gate.require_reusable_c2("C3", bad_run, []))
+for variant in ["C2", "C2D1", "C2D2", "C"]:
+    rejects_stage_gate(lambda: stage_gate.require_reusable_c2(variant, tested_c2, []))
+for path in ["personal/locks.json", "personal/manifest.xml", "personal/setup.py",
+             "personal/patches/network/new.patch", ".github/actions/networking-config/action.yml",
+             "personal/modules/module.c", "personal/lz4/lz4.c", "personal/adios/adios.c"]:
+    rejects_stage_gate(lambda: stage_gate.require_reusable_c2("C3", tested_c2, [path]))
+# Check real Git ancestry and all current committed/uncommitted recipe paths,
+# including the new helper; a synthetic network mock cannot hide source drift.
+head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=workspace, text=True).strip()
+actual_delta = stage_gate.source_delta(head, include_worktree=True)
+reuse_eligible = set(actual_delta) <= stage_gate.ALLOWED_C3_PATHS
+if reuse_eligible:
+    stage_gate.require_reusable_c2("C3", tested_c2, actual_delta)
+else:
+    # A later source/lock upgrade must reject reuse, while its normal same-HEAD
+    # predecessor path remains available rather than failing every local check.
+    rejects_stage_gate(lambda: stage_gate.require_reusable_c2("C3", tested_c2, actual_delta))
+before_baseline = subprocess.check_output(
+    ["git", "rev-parse", stage_gate.TESTED_C2_SHA + "^"], cwd=workspace, text=True).strip()
+rejects_stage_gate(lambda: stage_gate.source_delta(before_baseline))
+for variant, prior in stage_gate.PRIOR_STAGE.items():
+    prior_run = copy.deepcopy(tested_c2)
+    prior_run.update({"display_title": f"OnePlus 15 {prior}", "head_sha": head})
+    assert stage_gate.same_head_predecessor(variant, head, [prior_run])["head_sha"] == head
+    prior_run["head_sha"] = "0" * 40
+    rejects_stage_gate(lambda: stage_gate.same_head_predecessor(variant, head, [prior_run]))
+print(f"PASS: pinned C3 baseline gate, metadata/path rejection cases, real Git ancestry; {len(actual_delta)} changed paths, reuse_eligible={reuse_eligible}")
 build_step = next(s for s in data["jobs"]["build"]["steps"] if s.get("id") == "compile")
 assert "--config=fast" not in build_step["run"] and "--config=local" not in build_step["run"], "LOCAL KernelBuild cannot use the disk cache"
 assert "--disk_cache=" in build_step["run"] and "--repository_cache=" in build_step["run"]
